@@ -31,7 +31,7 @@ export async function DELETE(
       exercise.audioStorageKey,
       ...exercise.submissions
         .map((submission: { imageStorageKey: string | null }) => submission.imageStorageKey)
-        .filter((key): key is string => Boolean(key)),
+        .filter((key: string | null): key is string => Boolean(key)),
     ];
 
     await Promise.allSettled(storageKeys.map((key) => deleteStoredFile(key)));
