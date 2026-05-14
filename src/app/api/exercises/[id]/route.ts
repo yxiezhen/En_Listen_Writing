@@ -30,7 +30,7 @@ export async function DELETE(
     const storageKeys = [
       exercise.audioStorageKey,
       ...exercise.submissions
-        .map((submission) => submission.imageStorageKey)
+        .map((submission: { imageStorageKey: string | null }) => submission.imageStorageKey)
         .filter((key): key is string => Boolean(key)),
     ];
 
