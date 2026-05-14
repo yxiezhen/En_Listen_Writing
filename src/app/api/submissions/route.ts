@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { evaluateWriting } from "@/lib/ai/deepseek";
 import { jsonError } from "@/lib/api";
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
       studentText: payload.text,
     });
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const submission = await tx.writingSubmission.create({
         data: {
           userId: user.id,
