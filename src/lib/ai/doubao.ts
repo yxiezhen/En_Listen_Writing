@@ -77,8 +77,17 @@ export async function summarizeAudio(transcript: string): Promise<AudioSummary> 
   "level": "middle-school",
   "keyPoints": ["point 1", "point 2", "point 3"],
   "keywords": ["keyword 1", "keyword 2"],
-  "idealSummary": "an ideal English summary for a middle-school student"
+  "idealSummary": "an ideal English summary for a middle-school student",
+  "comprehensionQuestions": [
+    {
+      "question": "a multiple-choice question that checks listening comprehension",
+      "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+      "answer": "A"
+    }
+  ]
 }
+
+Create 3 to 5 comprehensionQuestions. Each question must have exactly 4 options and one answer letter. The correct answer should be directly supported by the transcript.
 
 Transcript:
 ${transcript}`,

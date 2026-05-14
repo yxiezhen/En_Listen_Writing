@@ -12,6 +12,38 @@ export function mockAudioSummary(): AudioSummary {
     ],
     keywords: ["reading project", "share books", "confidence", "English habits"],
     idealSummary: `The passage is about a school reading project. Students read and share books together, which helps them improve their English habits and become more confident.`,
+    comprehensionQuestions: [
+      {
+        question: "What is the listening passage mainly about?",
+        options: [
+          "A. A school reading project",
+          "B. A new sports club",
+          "C. A summer travel plan",
+          "D. A science competition",
+        ],
+        answer: "A",
+      },
+      {
+        question: "What do students do in the project?",
+        options: [
+          "A. They write songs",
+          "B. They share books and discuss ideas",
+          "C. They take photos of the school",
+          "D. They learn to cook meals",
+        ],
+        answer: "B",
+      },
+      {
+        question: "How does the project help students?",
+        options: [
+          "A. It helps them win sports games",
+          "B. It helps them build confidence and English habits",
+          "C. It helps them learn math faster",
+          "D. It helps them travel abroad",
+        ],
+        answer: "B",
+      },
+    ],
   };
 }
 

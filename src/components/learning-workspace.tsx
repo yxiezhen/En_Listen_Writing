@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
 type User = {
@@ -32,6 +32,11 @@ type AudioSummary = {
   keyPoints: string[];
   keywords: string[];
   idealSummary: string;
+  comprehensionQuestions?: Array<{
+    question: string;
+    options: string[];
+    answer: "A" | "B" | "C" | "D";
+  }>;
 };
 
 type Exercise = {
@@ -128,10 +133,14 @@ export function LearningWorkspace({
   const [latestSubmission, setLatestSubmission] = useState<Submission | null>(null);
   const [status, setStatus] = useState<ApiState>("idle");
   const [message, setMessage] = useState("");
+  const [readingQuestionIndex, setReadingQuestionIndex] = useState<number | null>(null);
+  const [speechVoices, setSpeechVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState("");
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>(initialAdminUsers);
   const [exerciseQuery, setExerciseQuery] = useState("");
   const [exercisePage, setExercisePage] = useState(1);
   const busyRef = useRef(false);
+  const speechTimerRef = useRef<number | null>(null);
 
   const isBusy = status === "loading";
   const effectiveExerciseId = selectedExerciseId || exercises[0]?.id || "";
@@ -173,6 +182,43 @@ export function LearningWorkspace({
   const selectedKnowledgePoints = knowledgePoints.filter(
     (point) => point.evaluation?.submission?.exercise?.id === effectiveExerciseId,
   );
+  const selectedSpeechVoice = useMemo(
+    () =>
+      speechVoices.find((voice) => voice.voiceURI === selectedVoiceURI) ??
+      getPreferredEnglishVoice(speechVoices),
+    [speechVoices, selectedVoiceURI],
+  );
+
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) {
+      return;
+    }
+
+    const loadVoices = () => {
+      const voices = window.speechSynthesis
+        .getVoices()
+        .filter((voice) => voice.lang.toLowerCase().startsWith("en"));
+      setSpeechVoices(voices);
+      setSelectedVoiceURI((current) => {
+        if (current && voices.some((voice) => voice.voiceURI === current)) {
+          return current;
+        }
+
+        return getPreferredEnglishVoice(voices)?.voiceURI ?? "";
+      });
+    };
+
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+      if (speechTimerRef.current) {
+        window.clearTimeout(speechTimerRef.current);
+      }
+      window.speechSynthesis.cancel();
+    };
+  }, []);
 
   async function signIn(formData: FormData) {
     await runAction("正在登录学习档案...", async () => {
@@ -309,6 +355,51 @@ export function LearningWorkspace({
       await refreshData();
       setMessage("批改完成，知识点已加入复习库。");
     });
+  }
+
+  function readComprehensionQuestion(
+    question: NonNullable<AudioSummary["comprehensionQuestions"]>[number],
+    index: number,
+  ) {
+    if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
+      setStatus("error");
+      setMessage("当前浏览器不支持朗读功能，请换用 Chrome、Edge 或 Safari。");
+      return;
+    }
+
+    if (readingQuestionIndex === index) {
+      window.speechSynthesis.cancel();
+      setReadingQuestionIndex(null);
+      return;
+    }
+
+    const text = [
+      `Question ${index + 1}. ${question.question}`,
+      ...question.options,
+    ].join(" ");
+    const currentVoices = window.speechSynthesis.getVoices();
+    const voice =
+      currentVoices.find((item) => item.voiceURI === selectedVoiceURI) ??
+      selectedSpeechVoice ??
+      null;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = voice?.lang ?? "en-US";
+    utterance.voice = voice;
+    utterance.rate = 0.72;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    utterance.onend = () => setReadingQuestionIndex(null);
+    utterance.onerror = () => setReadingQuestionIndex(null);
+
+    if (speechTimerRef.current) {
+      window.clearTimeout(speechTimerRef.current);
+    }
+    window.speechSynthesis.cancel();
+    setReadingQuestionIndex(index);
+    speechTimerRef.current = window.setTimeout(() => {
+      window.speechSynthesis.speak(utterance);
+      speechTimerRef.current = null;
+    }, 80);
   }
 
   async function refreshData() {
@@ -635,6 +726,57 @@ export function LearningWorkspace({
                     ))}
                   </ul>
                 </div>
+                {selectedExercise.summary.comprehensionQuestions?.length ? (
+                  <div className="mt-5 rounded-2xl bg-white p-4 text-sm text-slate-700 ring-1 ring-slate-200">
+                    <div className="font-medium text-slate-900">
+                      听力选择题（含答案）
+                    </div>
+                    {speechVoices.length ? (
+                      <label className="mt-3 block text-xs font-medium text-slate-600">
+                        朗读声音
+                        <select
+                          value={selectedVoiceURI}
+                          onChange={(event) => setSelectedVoiceURI(event.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500"
+                        >
+                          {speechVoices.map((voice) => (
+                            <option key={voice.voiceURI} value={voice.voiceURI}>
+                              {voice.name} ({voice.lang})
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                    <div className="mt-3 space-y-4">
+                      {selectedExercise.summary.comprehensionQuestions.map(
+                        (item, index) => (
+                          <article key={`${item.question}-${index}`}>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <p className="font-medium text-slate-900">
+                                {index + 1}. {item.question}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => readComprehensionQuestion(item, index)}
+                                className="shrink-0 rounded-full border border-blue-200 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                              >
+                                {readingQuestionIndex === index ? "停止本题" : "朗读本题"}
+                              </button>
+                            </div>
+                            <ul className="mt-2 space-y-1 text-slate-600">
+                              {item.options.map((option) => (
+                                <li key={option}>{option}</li>
+                              ))}
+                            </ul>
+                            <p className="mt-2 font-semibold text-blue-700">
+                              答案：{item.answer}
+                            </p>
+                          </article>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               <form
@@ -730,6 +872,28 @@ function waitForPaint() {
       requestAnimationFrame(() => resolve());
     });
   });
+}
+
+function getPreferredEnglishVoice(voices: SpeechSynthesisVoice[]) {
+  const preferredNames = [
+    "Google US English",
+    "Microsoft Aria",
+    "Microsoft Jenny",
+    "Samantha",
+    "Alex",
+    "Ava",
+    "Allison",
+    "Daniel",
+  ];
+
+  return (
+    preferredNames
+      .map((name) => voices.find((voice) => voice.name.includes(name)))
+      .find(Boolean) ??
+    voices.find((voice) => voice.lang === "en-US") ??
+    voices[0] ??
+    null
+  );
 }
 
 function AdminUserPanel({

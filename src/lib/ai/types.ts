@@ -7,6 +7,16 @@ export const audioSummarySchema = z.object({
   keyPoints: z.array(z.string()),
   keywords: z.array(z.string()),
   idealSummary: z.string(),
+  comprehensionQuestions: z
+    .array(
+      z.object({
+        question: z.string(),
+        options: z.array(z.string()).length(4),
+        answer: z.enum(["A", "B", "C", "D"]),
+      }),
+    )
+    .max(5)
+    .default([]),
 });
 
 export const evaluationSchema = z.object({
