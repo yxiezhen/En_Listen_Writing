@@ -6,6 +6,7 @@
     "dev": "next dev -H 0.0.0.0 -p 15666",
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 15666",
+    "postinstall": "prisma generate",
     "lint": "eslint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
